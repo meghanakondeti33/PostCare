@@ -17,6 +17,7 @@ def test_postgres_url_without_sslmode():
     assert url == "postgresql+asyncpg://user:secretpass@localhost:5432/postcare"
     assert "ssl" not in connect_args
     assert "sslmode" not in url
+    assert "channel_binding" not in url
 
 
 def test_neon_postgres_url_with_sslmode_require():
@@ -31,14 +32,33 @@ def test_neon_postgres_url_with_sslmode_require():
     assert connect_args.get("ssl") == "require"
 
 
+def test_neon_postgres_url_with_channel_binding():
+    raw = "postgresql://user:secretpass@ep-xyz.neon.tech/postcare?channel_binding=require"
+    url, connect_args = prepare_database_config(raw)
+
+    assert url.startswith("postgresql+asyncpg://")
+    assert "channel_binding" not in url
+
+
+def test_neon_postgres_url_with_sslmode_and_channel_binding():
+    raw = "postgresql://user:secretpass@ep-xyz.neon.tech/postcare?sslmode=require&channel_binding=require&application_name=postcare_prod"
+    url, connect_args = prepare_database_config(raw)
+
+    assert url.startswith("postgresql+asyncpg://")
+    assert "sslmode" not in url
+    assert "channel_binding" not in url
+    assert "application_name=postcare_prod" in url
+    assert connect_args.get("ssl") == "require"
+
+
 def test_postgres_url_with_other_sslmodes():
     # verify-full
     url_vf, connect_args_vf = prepare_database_config(
-        "postgresql+asyncpg://user:pass@ep-xyz.neon.tech/postcare?sslmode=verify-full&channel_binding=disable"
+        "postgresql+asyncpg://user:pass@ep-xyz.neon.tech/postcare?sslmode=verify-full&channel_binding=require"
     )
     assert "sslmode" not in url_vf
+    assert "channel_binding" not in url_vf
     assert connect_args_vf.get("ssl") == "verify-full"
-    assert "channel_binding=disable" in url_vf
 
     # disable
     url_dis, connect_args_dis = prepare_database_config(

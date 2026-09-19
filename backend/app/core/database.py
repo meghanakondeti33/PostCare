@@ -17,6 +17,8 @@ def prepare_database_config(raw_url: str) -> Tuple[str, Dict[str, Any]]:
        - Converts postgresql:// or postgres:// scheme to postgresql+asyncpg://
        - Extracts and strips 'sslmode' query parameter (e.g., sslmode=require) from query parameters
          to prevent asyncpg throwing TypeError: connect() got an unexpected keyword argument 'sslmode'
+       - Strips asyncpg-incompatible libpq query parameters (e.g. channel_binding, gssencmode, sslcompression)
+         to prevent asyncpg throwing TypeError: connect() got an unexpected keyword argument 'channel_binding'
        - Translates 'sslmode' into asyncpg-compatible connect_args["ssl"] = 'require' / 'verify-full' / etc.
          so TLS security remains active.
     """
@@ -53,6 +55,19 @@ def prepare_database_config(raw_url: str) -> Tuple[str, Dict[str, Any]]:
                 connect_args["ssl"] = False
             else:
                 connect_args["ssl"] = "require"
+
+        # Remove asyncpg-incompatible libpq parameters from URL query dict
+        incompatible_params = [
+            "channel_binding",
+            "gssencmode",
+            "sslcompression",
+            "sslcert",
+            "sslkey",
+            "sslrootcert",
+            "sslcrl",
+        ]
+        for param in incompatible_params:
+            query_dict.pop(param, None)
         
         new_url = url.set(drivername=drivername, query=query_dict)
         return new_url.render_as_string(hide_password=False), connect_args
