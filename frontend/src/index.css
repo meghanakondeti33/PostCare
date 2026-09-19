@@ -1,0 +1,99 @@
+@import "tailwindcss";
+
+@theme {
+  --color-medical-paper: #f8fafc;
+  --color-panel-ivory: #ffffff;
+  --color-charcoal-50: #f8fafc;
+  --color-charcoal-100: #f1f5f9;
+  --color-charcoal-200: #e2e8f0;
+  --color-charcoal-300: #cbd5e1;
+  --color-charcoal-400: #94a3b8;
+  --color-charcoal-500: #64748b;
+  --color-charcoal-600: #475569;
+  --color-charcoal-700: #334155;
+  --color-charcoal-800: #1e293b;
+  --color-charcoal-900: #0f172a;
+  
+  --color-eucalyptus-50: #ecfeff;
+  --color-eucalyptus-100: #cffafe;
+  --color-eucalyptus-200: #a5f3fc;
+  --color-eucalyptus-500: #06b6d4;
+  --color-eucalyptus-600: #0891b2;
+  --color-eucalyptus-700: #0e7490;
+  --color-eucalyptus-800: #155e75;
+  --color-eucalyptus-900: #164e63;
+
+  --color-sage-50: #f0fdf4;
+  --color-sage-100: #dcfce7;
+  --color-sage-600: #16a34a;
+  --color-sage-700: #15803d;
+  --color-sage-800: #166534;
+
+  --color-amber-50: #fffbeb;
+  --color-amber-100: #fef3c7;
+  --color-amber-600: #d97706;
+  --color-amber-700: #b45309;
+  --color-amber-800: #92400e;
+
+  --color-coral-50: #fef2f2;
+  --color-coral-100: #fee2e2;
+  --color-coral-600: #dc2626;
+  --color-coral-700: #b91c1c;
+  --color-coral-800: #991b1b;
+
+  --color-lavender-50: #faf5ff;
+  --color-lavender-100: #f3e8ff;
+  --color-lavender-600: #9333ea;
+  --color-lavender-700: #7e22ce;
+  --color-lavender-800: #6b21a8;
+}
+
+@layer base {
+  html, body {
+    margin: 0;
+    padding: 0;
+    background-color: #f8fafc;
+    color: #0f172a;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* Custom clinical helpers */
+.clinical-card {
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03);
+}
+
+.clinical-badge-sage {
+  background-color: #f0fdf4;
+  color: #15803d;
+  border: 1px solid #bbf7d0;
+}
+
+.clinical-badge-amber {
+  background-color: #fffbeb;
+  color: #b45309;
+  border: 1px solid #fde68a;
+}
+
+.clinical-badge-coral {
+  background-color: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
+
+.clinical-badge-lavender {
+  background-color: #faf5ff;
+  color: #7e22ce;
+  border: 1px solid #e9d5ff;
+}
+
+.clinical-badge-eucalyptus {
+  background-color: #ecfeff;
+  color: #0e7490;
+  border: 1px solid #a5f3fc;
+}
