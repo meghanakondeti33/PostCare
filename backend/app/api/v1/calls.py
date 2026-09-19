@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.core.database import get_db
+from app.core.config import settings
 from app.models.domain import (
     Call, Conversation, OutreachTask, Patient, Protocol, TriageAssessment,
     ConsensusDecision, Documentation, TaskStateEnum, AIUsage
@@ -78,7 +79,7 @@ async def simulate_outreach_call(
         ended_at=now,
         duration_seconds=180,
         outcome=outcome,
-        recording_url=f"http://localhost:8000/recordings/{call_id}.mp3"
+        recording_url=f"{settings.PUBLIC_BASE_URL.rstrip('/')}/recordings/{call_id}.mp3"
     )
     db.add(call)
     

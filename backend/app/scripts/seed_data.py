@@ -10,6 +10,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../.
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import AsyncSessionLocal, engine, Base
+from app.core.config import settings
 from app.core.security import get_password_hash
 from app.models.domain import (
     Hospital, User, Patient, Encounter, Discharge, Condition, Observation,
@@ -23,11 +24,12 @@ from app.rag.protocol_rag import ProtocolRAGService
 
 
 
-async def seed_database():
+async def seed_database(drop_existing: bool = True):
 
     print("Initializing Database Schema...")
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
+        if drop_existing:
+            await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
         
     async with AsyncSessionLocal() as db:
@@ -277,7 +279,7 @@ async def seed_database():
             ended_at=now - timedelta(minutes=40),
             duration_seconds=300,
             outcome="ESCALATED",
-            recording_url="http://localhost:8000/recordings/call-metro-urgent-1.mp3",
+            recording_url=f"{settings.PUBLIC_BASE_URL.rstrip('/')}/recordings/call-metro-urgent-1.mp3",
             metadata_json={"simulated": True}
         )
         db.add(call)

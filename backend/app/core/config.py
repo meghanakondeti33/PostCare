@@ -20,6 +20,16 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24
     
+    # CORS & Public Base URL
+    CORS_ORIGINS: str = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173")
+    PUBLIC_BASE_URL: str = os.getenv("PUBLIC_BASE_URL", "http://localhost:8000")
+    
+    @property
+    def cors_origins_list(self) -> List[str]:
+        if isinstance(self.CORS_ORIGINS, str):
+            return [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
+        return self.CORS_ORIGINS
+    
     # AI Config
     AI_PROVIDER: str = os.getenv("AI_PROVIDER", "mock")
     OPENAI_API_KEY: Optional[str] = os.getenv("OPENAI_API_KEY", None)

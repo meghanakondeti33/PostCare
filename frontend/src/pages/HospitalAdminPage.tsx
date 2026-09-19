@@ -654,7 +654,7 @@ export const HospitalAdminPage: React.FC = () => {
                   <Badge variant="sage">ACTIVE AUTO-SYNC</Badge>
                 </div>
                 <p className="text-[11px] text-slate-600 font-mono">
-                  Endpoint: http://localhost:8000/api/v1/ehr/records
+                  Endpoint: /api/v1/ehr/records
                 </p>
               </div>
             </CardContent>
