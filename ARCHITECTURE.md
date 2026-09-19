@@ -1,73 +1,56 @@
-# Architecture Documentation (ARCHITECTURE.md)
+# PostCare Architecture & System Design Document
 
-## System Overview & Component Diagram
+*(For the complete submission documentation index, visit [`docs/final/INDEX.md`](./docs/final/INDEX.md) and [`docs/final/ARCHITECTURE.md`](./docs/final/ARCHITECTURE.md))*
 
-The **Multi-Hospital Post-Discharge Outreach Platform** is built as a production-oriented modular monolith designed for multi-tenant isolation, capacity-aware concurrency queueing, dual AI consensus triage, and clinical human-in-the-loop escalation.
+## 1. System Overview
+
+**PostCare** is a production-ready, multi-tenant AI-assisted healthcare outreach and clinical escalation platform. It enables hospital systems to manage post-discharge patient outreach campaigns, automate AI voice intake and triage, apply strict multi-model consensus to clinical assessments, and escalate concerning patient cases to human clinical reviewers with automated Mock EHR (FHIR R4) synchronization.
+
+---
+
+## 2. Master System Architecture Diagram
 
 ```mermaid
-graph TD
-    Client["React + TypeScript + Vite Frontend<br/>(4 Workstations)"]
-    
-    subgraph FastAPI_Backend ["FastAPI Backend (Modular Monolith)"]
-        AuthModule["JWT Auth & RBAC Dependencies"]
-        TenantGuard["Tenant Isolation Guard (hospital_id)"]
-        
-        APILayer["API Routers<br/>(Patients, Queue, Campaigns, Calls, Escalations)"]
-        
-        QueueEngine["Queue & Scheduling Engine<br/>(Priority Formula + Concurrency Lock)"]
-        
-        AIProvider["AI Provider Abstraction<br/>(GeminiProvider / OpenAIProvider / MockAIProvider)"]
-        PromptRepo["Versioned Prompt Repo (v1.0.0)"]
-        
-        RAGModule["Tenant-Isolated Protocol RAG Service"]
-        ConsensusModule["Multi-Assessment & Consensus Engine<br/>(Assessment A + Assessment B + Rule Engine)"]
-        
-        ControlledTools["Controlled AI Tools Framework"]
-        EHRModule["Mock EHR Integration (FHIR R4)"]
-        
-        AuditObs["Observability & Audit Logger"]
+flowchart TD
+    subgraph ClientLayer ["Client Layer (Vercel Frontend)"]
+        User["User / Healthcare Staff"] -->|HTTPS / JWT| Frontend["React 18 + Vite SPA\n(Hospital Admin, Campaign Mgr,\nClinical Reviewer, Platform Admin)"]
     end
-    
-    Database[(PostgreSQL Database<br/>SQLAlchemy 2.x + pgvector)]
-    RedisQueue[(Redis / Celery Worker Queue)]
-    
-    Client -->|HTTPS / JWT| AuthModule
-    AuthModule --> TenantGuard
-    TenantGuard --> APILayer
-    
-    APILayer --> QueueEngine
-    QueueEngine -->|SELECT FOR UPDATE SKIP LOCKED| Database
-    QueueEngine --> RedisQueue
-    
-    APILayer --> AIProvider
-    AIProvider --> PromptRepo
-    AIProvider --> RAGModule
-    RAGModule --> Database
-    
-    AIProvider --> ConsensusModule
-    ConsensusModule --> ControlledTools
-    ControlledTools --> Database
-    ControlledTools --> EHRModule
-    
-    APILayer --> AuditObs
-    AuditObs --> Database
+
+    subgraph APILayer ["API & Control Layer (Render Python Backend)"]
+        Frontend -->|REST API / JSON| FastAPI["FastAPI Application (Python 3.11.9)\n- JWT Auth & RBAC Middleware\n- X-Hospital-Id Tenant Isolator"]
+    end
+
+    subgraph ApplicationServices ["Core Application Services"]
+        FastAPI --> QueueEngine["Intelligent Queue Engine\n- Multi-factor Priority Formula\n- Capacity Concurrency Limiter\n- FOR UPDATE SKIP LOCKED"]
+        FastAPI --> TriagePipeline["Dual AI Triage Engine\n- Model A: Protocol Focus\n- Model B: Holistic Focus\n- Dynamic Conservative Consensus"]
+        FastAPI --> EHRGateway["Mock EHR Gateway\n- FHIR R4 Record Creator\n- Resolution Auto-Sync"]
+        FastAPI --> AuditObs["Observability & Audit Service\n- AuditLog & SystemHealth\n- AI Usage & Token Tracking"]
+    end
+
+    subgraph DataStorage ["Data & Cache Storage Layer"]
+        QueueEngine -->|Asyncpg Connection| NeonDB[(Neon PostgreSQL\n- Encrypted TLS/SSL\n- 26+ Domain Schema)]
+        FastAPI -->|Asyncpg Connection| NeonDB
+        QueueEngine -->|Redis Protocol| UpstashRedis[(Upstash Redis\n- Task Cache & Locks)]
+    end
+
+    subgraph AIServices ["AI & RAG Grounding Layer"]
+        TriagePipeline -->|Google GenAI SDK| GeminiAPI["Google Gemini 3.5 Flash API\n(Or MockAIProvider Fallback)"]
+        TriagePipeline --> ProtocolRAG["Protocol RAG Engine\n- Tenant-Scoped Chunks\n- Keyword / Vector Relevance"]
+    end
+
+    subgraph GuardrailBoundary ["Controlled AI Tool & Execution Boundary"]
+        GeminiAPI -->|Structured Output| Validation["Pydantic Schema Validation"]
+        Validation -->|Business Rule Audit| RuleEngine["Clinical Rule Engine\n(Strict Conservative Fallback)"]
+        RuleEngine -->|Authorized Actions Only| NeonDB
+        RuleEngine -->|Audit Trail| AuditObs
+    end
 ```
 
-## Architectural Boundaries
+---
 
-1. **Multi-Tenancy & Authorization Boundary**:
-   - Every database query and background worker task carries an explicit `hospital_id` filter.
-   - Frontend passes `X-Hospital-Id` header (or reads from JWT user context).
-   - Zero cross-tenant data retrieval across hospitals.
+## 3. Core Architectural Principles
 
-2. **Queue Concurrency Boundary**:
-   - Outbound calling capacity is strictly limited per hospital tenant (e.g. 10 concurrent calls).
-   - Database level `SELECT ... FOR UPDATE SKIP LOCKED` guarantees two workers never reserve the same slot or exceed capacity.
-
-3. **AI Control Boundary**:
-   - AI models NEVER directly touch database tables.
-   - All side effects (escalation creation, callback scheduling, EHR sync) execute via `ControlledTools` with schema validation, business rule checks, and audit logging.
-
-4. **Clinical Safety Consensus Boundary**:
-   - Dual AI assessments (Assessment A & B) plus a clinical Rule Engine operate independently.
-   - Under `STRICT_CONSERVATIVE` consensus policy, any indication of `URGENT`, `CONCERNING`, or `UNCERTAIN` triggers mandatory human escalation.
+1. **Multi-Tenancy**: Every data entity and query is strictly isolated by `hospital_id`.
+2. **Deterministic Guardrails**: AI models generate structured JSON predictions, which are validated by Pydantic schemas and evaluated by a strict conservative rule engine.
+3. **Capacity & Concurrency**: Outreach task allocation uses `FOR UPDATE SKIP LOCKED` and respects hospital capacity limits.
+4. **Resilience & Recovery**: Automatic stale task recovery for worker failures, exponential backoff retries, and fallback to Mock AI on quota exhaustion.

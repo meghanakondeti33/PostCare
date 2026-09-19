@@ -1,19 +1,14 @@
-# Development AI Usage Documentation (DEVELOPMENT_AI_USAGE.md)
+# PostCare Development AI Usage & Engineering History
 
-## AI-Assisted Engineering Workflows
+*(For the complete submission documentation index, visit [`docs/final/INDEX.md`](./docs/final/INDEX.md) and [`docs/final/DEVELOPMENT_AI_USAGE.md`](./docs/final/DEVELOPMENT_AI_USAGE.md))*
 
-During the design and construction of the PostCare platform, AI development tools were utilized for architecture planning, schema design, queue modeling, prompt engineering, and test suite generation.
+## Overview
 
-### Key Engineering Prompts & AI Contributions
+In accordance with PRD v2.0 requirements, this document transparently records how AI-assisted engineering tools—specifically **Google Antigravity IDE** powered by **Gemini** models—were utilized during the design, implementation, testing, debugging, and deployment of the PostCare platform.
 
-1. **Multi-Tenant Architecture & Concurrency Locking**:
-   - *Prompt Goal*: Design a database-backed concurrency reservation engine for FastAPI and SQLAlchemy 2.x that prevents worker race conditions without requiring external microservices.
-   - *Outcome*: Implemented `SELECT ... FOR UPDATE SKIP LOCKED` inside [`backend/app/queue/queue_engine.py`](file:///c:/Users/CSE/Desktop/PostCare/backend/app/queue/queue_engine.py).
-
-2. **Dual AI Assessment & Consensus Policy**:
-   - *Prompt Goal*: Implement dual independent LLM evaluation paths (Protocol Matching vs Holistic Deterioration Risk) and a conservative consensus engine.
-   - *Outcome*: Built [`backend/app/ai/consensus.py`](file:///c:/Users/CSE/Desktop/PostCare/backend/app/ai/consensus.py) with configurable policies (`STRICT_CONSERVATIVE`, `MAJORITY_VOTE`, `RULE_OVERRIDE_ONLY`).
-
-3. **Clinical Safety Benchmark Dataset**:
-   - *Prompt Goal*: Construct a 25-case clinical evaluation dataset covering urgent red flags, post-op complications, ambiguous statements, and prompt injection attacks.
-   - *Outcome*: Created [`backend/app/evaluation/run_safety_eval.py`](file:///c:/Users/CSE/Desktop/PostCare/backend/app/evaluation/run_safety_eval.py) achieving 0.00% False Negative Rate.
+## Key Phases
+1. **System Architecture**: Multi-tenant database modeling (`hospital_id` boundaries).
+2. **Queue Engine**: Priority scoring and `FOR UPDATE SKIP LOCKED` concurrency.
+3. **Dual Triage & Consensus**: Assessment A & B prompt engineering and strict conservative policy.
+4. **Safety Evaluation**: 25-case deterministic safety benchmark with zero false negatives.
+5. **Production Deployment**: Neon PostgreSQL SSL normalization and Python 3.11.9 runtime pinning.

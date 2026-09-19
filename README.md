@@ -1,163 +1,91 @@
-# Multi-Hospital Post-Discharge Outreach Platform
+# PostCare: Multi-Hospital Post-Discharge Outreach & Clinical Escalation Platform
 
-> Autonomous AI-Powered Patient Follow-Up, Clinical Triage & Hospital Outreach Operations Platform
-
----
-
-## 1. Project Overview
-
-PostCare is a multi-tenant AI-powered healthcare operations platform designed for hospital systems to automate post-discharge patient outreach, queue management, clinical triage, dual-assessment consensus escalation, and human-in-the-loop review.
-
-The system manages the complete post-discharge journey:
-$$\text{Hospital Onboarding} \rightarrow \text{Discharge Feed Ingestion} \rightarrow \text{Eligibility Engine} \rightarrow \text{Intelligent Queue} \rightarrow \text{Capacity-Aware Scheduling} \rightarrow \text{AI Voice Simulator} \rightarrow \text{Structured Triage} \rightarrow \text{Dual Assessment Consensus} \rightarrow \text{Clinical Review Inbox} \rightarrow \text{Mock EHR Sync} \rightarrow \text{Observability \& Audit}$$
+> Autonomous AI-Powered Patient Follow-Up, Intelligent Queue Management, Dual-Assessment Clinical Triage & Human-in-the-Loop Review Platform
 
 ---
 
-## 2. Tech Stack
+## 1. Executive Overview
 
-- **Frontend**: React 18, TypeScript, Vite, Tailwind CSS, Lucide Icons, React Router DOM, TanStack Query.
-- **Backend**: Python 3.11, FastAPI, Pydantic v2, SQLAlchemy 2.x (Async), AsyncPG / SQLite (aiosqlite).
-- **Database**: PostgreSQL (with `pgvector` for clinical protocol embeddings; SQLite fallback for local test suite).
-- **AI Abstraction**: Multi-provider support (`GeminiProvider`, `OpenAIProvider`, `MockAIProvider`), Semantic Prompt Versioning (`v1.0.0`), Controlled AI Tools Framework.
-- **Safety Evaluation**: Fixed 25-case clinical benchmark dataset with 0.00% False Negative Rate reporting.
+**PostCare** is a production-ready, multi-tenant AI-assisted healthcare outreach and clinical escalation platform. It enables hospital systems to automate post-discharge patient outreach, queue management, AI voice intake and triage, dual-model consensus escalation, and human clinical review with automated Mock EHR (FHIR R4) synchronization.
 
----
-
-## 3. Key Architecture & Features
-
-1. **Strict Multi-Tenant Isolation**:
-   - Every patient record, outreach task, call, protocol, and escalation carries an explicit `hospital_id`. Cross-tenant data retrieval is blocked at the database repository layer.
-2. **Intelligent Capacity-Aware Outbound Queue Engine**:
-   - Dynamic prioritization formula:
-     $$\text{priority} = \text{clinical\_risk} + \text{deadline\_pressure} + \text{callback\_urgency} + \text{campaign\_priority} + \text{waiting\_time\_aging} - \text{retry\_penalty}$$
-   - Centralized concurrency control using `SELECT ... FOR UPDATE SKIP LOCKED` guarantees capacity limits (e.g., max 10 concurrent calls) are never exceeded.
-   - Exponential backoff retries for `NO_ANSWER`, `BUSY`, `VOICEMAIL`, `DROPPED`.
-   - Patient-requested callback scheduling and crashed worker heartbeat recovery.
-3. **Dual AI Assessment & Consensus Escalation**:
-   - Executes Assessment A (Protocol Focus), Assessment B (Holistic Risk), and Clinical Rule Engine.
-   - Applies configurable `STRICT_CONSERVATIVE` policy to force human escalation if any engine flags `URGENT`, `CONCERNING`, or `UNCERTAIN`.
-4. **4 Role-Specific Workstations**:
-   - **Platform Admin (`/platform`)**: Multi-hospital tenant management, infrastructure health, AI metrics, safety benchmark runner.
-   - **Hospital Admin (`/hospital`)**: Hospital settings, discharge feed ingestion, protocols, user management, EHR sync settings.
-   - **Campaign Manager (`/campaigns`, `/queue`)**: Campaign lifecycle state machine, capacity meter, live 25-patient queue simulator.
-   - **Clinical Reviewer (`/review`)**: Escalation inbox, call transcript inspector, dual assessment consensus viewer, clinical override resolution form.
-5. **Reusable Patient Search & Chronological Operational Timeline**:
-   - Unified search modal displaying patient demographics, MRN, high-risk flag, and chronological audit journey.
+```
+Hospital Onboarding ──► Discharge Feed ──► Eligibility Engine ──► Intelligent Queue (FOR UPDATE SKIP LOCKED)
+  ──► Capacity-Aware Scheduling ──► AI Voice Intake ──► Dual Triage Assessment (Model A & B)
+    ──► Strict Conservative Consensus ──► Clinical Reviewer Inbox ──► Mock EHR Sync ──► Observability & Audit
+```
 
 ---
 
-## 4. Demo Login Credentials
+## 2. Complete Submission Documentation
 
-| Role | Email | Password | Scope |
-| :--- | :--- | :--- | :--- |
-| **Platform Admin** | `admin@platform.gov` | `AdminPass123!` | Multi-Hospital Global |
-| **Hospital Admin** | `admin@metrohealth.org` | `MetroAdmin123!` | MetroHealth System (`METRO`) |
-| **Campaign Manager** | `manager@metrohealth.org` | `Manager123!` | MetroHealth System (`METRO`) |
-| **Clinical Reviewer** | `reviewer@metrohealth.org` | `Reviewer123!` | MetroHealth System (`METRO`) |
+The complete, authoritative documentation package is located in `/docs/final/`:
 
----
-
-## 5. Local Setup & Execution Guide
-
-### Prerequisites
-- Python 3.11+
-- Node.js 18+ and npm
-
-### Quick Start Commands
-
-1. **Setup Backend**:
-   ```bash
-   cd backend
-   python -m venv venv
-   # On Windows:
-   .\venv\Scripts\activate
-   # On Linux/macOS:
-   source venv/bin/activate
-   
-   pip install -r requirements.txt
-   pip install aiosqlite
-   ```
-
-2. **Seed Database (300+ Synthetic Patients across 4 Hospitals)**:
-   ```bash
-   python -m app.scripts.seed_data
-   ```
-
-3. **Run Safety Evaluation Benchmark**:
-   ```bash
-   python -m app.evaluation.run_safety_eval
-   ```
-
-4. **Run Scripted End-to-End Demo Scenario (36 Steps)**:
-   ```bash
-   python -m app.scripts.run_demo_scenario
-   ```
-
-5. **Start FastAPI Backend Server**:
-   ```bash
-   python -m app.main
-   ```
-   *Backend API runs at `http://localhost:8000` (Docs: `http://localhost:8000/api/v1/docs`)*
-
-6. **Start React Frontend**:
-   ```bash
-   cd ../frontend
-   npm install
-   npm run dev
-   ```
-   *Frontend app runs at `http://localhost:5173`*
+| Document | Link | Description |
+| :--- | :--- | :--- |
+| **Documentation Index** | [`docs/final/INDEX.md`](./docs/final/INDEX.md) | Complete index and roadmap for evaluators. |
+| **System Architecture** | [`docs/final/ARCHITECTURE.md`](./docs/final/ARCHITECTURE.md) | Component architecture, data flow, tenant boundaries, and security model. |
+| **Intelligent Queue Design** | [`docs/final/QUEUE_DESIGN.md`](./docs/final/QUEUE_DESIGN.md) | Multi-factor priority formula, capacity limiting, `SKIP LOCKED`, retries, backoff. |
+| **Safety Evaluation Report** | [`docs/final/SAFETY_EVALUATION.md`](./docs/final/SAFETY_EVALUATION.md) | 25-case benchmark, 0% false-negative rate metrics, confusion matrix. |
+| **AI System & Guardrails** | [`docs/final/AI_USAGE.md`](./docs/final/AI_USAGE.md) | Dual assessment models, system prompts, protocol RAG grounding, tool guardrails. |
+| **Development AI History** | [`docs/final/DEVELOPMENT_AI_USAGE.md`](./docs/final/DEVELOPMENT_AI_USAGE.md) | Transparent accounting of Google Antigravity & Gemini assistance during development. |
+| **Limitations & Tradeoffs** | [`docs/final/LIMITATIONS_AND_TRADEOFFS.md`](./docs/final/LIMITATIONS_AND_TRADEOFFS.md) | Simulated components, prototype security vs HIPAA roadmap, evaluation scope. |
+| **Evaluator Demo Guide** | [`docs/final/DEMO_GUIDE.md`](./docs/final/DEMO_GUIDE.md) | Step-by-step evaluator walkthrough across all 4 role workstations. |
+| **Deployment Guide** | [`docs/final/DEPLOYMENT.md`](./docs/final/DEPLOYMENT.md) | Cloud infrastructure guide for Render, Neon PostgreSQL (SSL), Upstash Redis, and Vercel. |
 
 ---
 
-# MANUAL STEPS FOR YOU
+## 3. Technology Stack & Key Verification Metrics
 
-Here are the step-by-step instructions for what you need to do manually to run and evaluate the project on your machine:
+- **Frontend**: React 18, TypeScript, Vite, Vanilla CSS + Tailwind CSS, Lucide Icons, React Router DOM (`Vite Build Exit Code 0`).
+- **Backend**: Python 3.11.9, FastAPI, Pydantic v2, AsyncSQLAlchemy 2.0, Asyncpg / Aiosqlite (`40/40 Pytest Passed`).
+- **Database**: Neon PostgreSQL (with SSL/TLS URL parser; SQLite fallback for local test suite).
+- **Cache & Queue**: Upstash Redis / Memory cache.
+- **AI Triage**: Google Gemini 3.5 Flash (`gemini-3.5-flash`) via `google-genai` SDK + `MockAIProvider` fallback.
+- **Clinical Safety Benchmark**: 25-case synthetic benchmark achieving **0.00% False Negative Rate** (18 True Positives, 7 True Negatives).
 
-- **Step 1: Install Required Software**
-  - Ensure you have **Python 3.11 or higher** installed (`python --version`).
-  - Ensure you have **Node.js 18 or higher** installed (`node -v`).
+---
 
-- **Step 2: Initialize Backend & Seed Database**
-  - Open a terminal and navigate to the project directory: `cd backend`.
-  - Activate the Python virtual environment: `.\venv\Scripts\activate` (Windows) or `source venv/bin/activate` (Linux/macOS).
-  - Run the database seeding script:
-    ```bash
-    python -m app.scripts.seed_data
-    ```
-    *This creates the database schema and seeds 4 hospital tenants, 6 users, 230+ synthetic patients, protocols, campaigns, and queue simulation tasks.*
+## 4. Pre-Configured Demo Credentials
 
-- **Step 3: Run the Clinical Safety Evaluation Benchmark**
-  - In the `backend` directory with the virtual environment activated, run:
-    ```bash
-    python -m app.evaluation.run_safety_eval
-    ```
-    *This executes the 25-case safety evaluation benchmark and outputs `safety_report.json` and `safety_report.md` reporting a 0.00% False Negative Rate.*
+| Role | Email | Password | Primary Dashboard | Scope |
+| :--- | :--- | :--- | :--- | :--- |
+| **Hospital Admin** | `admin@metrohealth.org` | `admin123` | `/hospital` | MetroHealth System (`hosp-metro-1`) |
+| **Campaign Manager** | `campaign@metrohealth.org` | `campaign123` | `/campaigns` | MetroHealth System (`hosp-metro-1`) |
+| **Clinical Reviewer** | `reviewer@metrohealth.org` | `reviewer123` | `/review` | MetroHealth System (`hosp-metro-1`) |
+| **Platform Admin** | `admin@postcare.health` | `platform123` | `/admin` | Multi-Hospital Global (`ALL`) |
 
-- **Step 4: Run the Scripted End-to-End Demo Scenario**
-  - In the `backend` directory, run:
-    ```bash
-    python -m app.scripts.run_demo_scenario
-    ```
-    *This automatically executes the 36-step end-to-end workflow from Platform Admin login through Queue simulation, AI intake, Consensus escalation, and EHR update.*
+---
 
-- **Step 5: Start the Backend API Server**
-  - In the `backend` directory, run:
-    ```bash
-    python -m app.main
-    ```
-    *The FastAPI backend will start listening at `http://localhost:8000`.*
+## 5. Local Setup & Quick Start
 
-- **Step 6: Start the Frontend Application**
-  - Open a second terminal window and navigate to the `frontend` directory: `cd frontend`.
-  - Start the Vite development server:
-    ```bash
-    npm run dev
-    ```
-  - Open your browser and navigate to `http://localhost:5173`.
+```bash
+# 1. Clone & Navigate to Backend
+cd backend
 
-- **Step 7: Log in and Explore the 4 Workstations**
-  - Click any of the **Quick Demo Persona Login** buttons on the login screen to explore:
-    - **Platform Admin**: View aggregate system health, multi-hospital metrics, and trigger safety evaluations.
-    - **Hospital Admin**: View ingested discharge feed, hospital settings, and protocols.
-    - **Campaign Manager**: Explore the Live Queue Simulator, capacity meter, and click **Simulate Queue Step** or **Simulate Urgent Call**.
-    - **Clinical Reviewer**: Open the escalation inbox, inspect patient transcript & dual AI assessments, and click **Resolve Escalation & Sync EHR**.
+# 2. Virtual Environment Setup
+python -m venv venv
+# On Windows: .\venv\Scripts\activate | On Linux/macOS: source venv/bin/activate
+pip install -r requirements.txt
+
+# 3. Non-Destructive Schema Initialization & Safe Demo Seed
+python -m app.scripts.init_prod_db
+python -m app.scripts.seed_prod_demo
+
+# 4. Run Backend Tests (40 Passed)
+$env:PYTHONPATH="."
+.\venv\Scripts\pytest -q
+
+# 5. Run Safety Evaluation Benchmark
+python -m app.evaluation.run_safety_eval
+
+# 6. Start Backend Server
+python -m app.main
+
+# 7. In a second terminal, start Frontend (Vite)
+cd ../frontend
+npm install
+npm run dev
+```
+
+- Frontend Dev Server: `http://localhost:5173`
+- Backend API & Docs: `http://localhost:8000/api/v1/docs`

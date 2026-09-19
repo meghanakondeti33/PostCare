@@ -1,13 +1,13 @@
-# Known Prototype Limitations & Tradeoffs (LIMITATIONS.md)
+# PostCare Architectural Limitations, Prototype Scope & Healthcare Roadmap
 
-1. **Simulated Telephony**:
-   - The platform includes a deterministic Voice Interaction Simulator rather than live PSTN telephony integration (Twilio / WebRTC). Audio recordings are simulated URLs.
+*(For the complete submission documentation index, visit [`docs/final/INDEX.md`](./docs/final/INDEX.md) and [`docs/final/LIMITATIONS_AND_TRADEOFFS.md`](./docs/final/LIMITATIONS_AND_TRADEOFFS.md))*
 
-2. **Synthetic Healthcare Data**:
-   - Synthetic dataset contains 300 patient discharge records across 4 hospitals. No real Protected Health Information (PHI) is used.
+## Overview & Prototype Boundaries
 
-3. **Mock EHR Backend**:
-   - EHR operations are handled by an in-memory / relational mock FHIR service rather than a live HL7/FHIR server integration.
+PostCare is an engineering proof-of-concept for AI-assisted healthcare outreach. It operates under the following explicit prototype tradeoffs:
 
-4. **Security Certification**:
-   - Implements JWT authentication, bcrypt/SHA256 password hashing, RBAC, and multi-tenant isolation. However, full production HIPAA / SOC2 compliance would require dedicated KMS key encryption, HSM integration, and independent security auditing.
+1. **Simulated Telephony**: Outreach calls are simulated via API (`/api/v1/calls/simulate`); no PSTN carrier is attached.
+2. **Mock EHR**: FHIR R4 JSON records are created and synced locally; no live Epic/Cerner connection.
+3. **Synthetic Data**: All patient names, MRNs, and discharge summaries are synthetic test data.
+4. **Synthetic Safety Benchmark**: The 25-case safety benchmark achieves a **0% false-negative rate** on synthetic data, but does not constitute real-world clinical certification.
+5. **HIPAA Notice**: PostCare is **not** HIPAA or SOC 2 certified. It is a prototype software project.

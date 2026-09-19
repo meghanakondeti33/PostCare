@@ -1,32 +1,14 @@
-# AI Architecture & Usage Documentation (AI_USAGE.md)
+# PostCare AI System & Dual Assessment Architecture
 
-## 1. Provider Abstraction Layer
+*(For the complete submission documentation index, visit [`docs/final/INDEX.md`](./docs/final/INDEX.md) and [`docs/final/AI_USAGE.md`](./docs/final/AI_USAGE.md))*
 
-The platform abstracts LLM interactions behind `AIProviderInterface` ([`backend/app/ai/provider.py`](file:///c:/Users/CSE/Desktop/PostCare/backend/app/ai/provider.py)):
-- **`MockAIProvider`**: Deterministic provider used for reproducible unit tests and safety evaluation benchmarks without requiring external API keys.
-- **`GeminiProvider`**: Direct integration with Google Gemini 2.5/1.5 API using structured JSON schema response modes.
-- **`OpenAIProvider`**: OpenAI ChatCompletions compatible interface (`gpt-4o`, `gpt-4o-mini`).
+## Overview
 
-Configured via `.env` variable `AI_PROVIDER=mock` (or `gemini`, `openai`).
+PostCare uses a dual-model, protocol-grounded AI triage system designed to evaluate post-discharge patient outreach conversations. To ensure clinical safety, AI models operate within strict architectural boundaries: they generate structured JSON predictions which are validated by backend Pydantic schemas and evaluated by a deterministic consensus engine.
 
----
-
-## 2. Agent Framework & Responsibilities
-
-1. **Voice Intake Agent**:
-   - Manages structured patient outreach dialogue.
-   - Verifies identity, follows hospital protocols, collects symptom responses.
-2. **Clinical Triage Agent**:
-   - Parses transcripts into Pydantic structured output (`ROUTINE`, `CONCERNING`, `URGENT`, `UNCERTAIN`).
-3. **Escalation Decision System**:
-   - Executes Dual AI Assessments (Assessment A & B) plus Rule Engine.
-   - Evaluates consensus policy (`STRICT_CONSERVATIVE`).
-4. **Documentation Agent**:
-   - Generates structured post-discharge clinical notes and syncs to Mock EHR.
-
----
-
-## 3. Explicit Prompt Versioning & Auditing
-
-All prompt templates are semantically versioned (e.g. `v1.0.0_intake`, `v1.0.0_triage`) in [`backend/app/ai/prompts.py`](file:///c:/Users/CSE/Desktop/PostCare/backend/app/ai/prompts.py).
-Every call assessment records the exact `prompt_version` in `TriageAssessment`, `ConsensusDecision`, and `AuditLog` tables for regulatory auditability.
+## Core Features
+1. **Multi-Provider Factory**: Supports Google Gemini 3.5 Flash (`GeminiAIProvider`) and offline deterministic mock (`MockAIProvider`).
+2. **Dual Triage Pipeline**: Model A (Protocol-Focused) + Model B (Holistic-Focused).
+3. **Strict Conservative Consensus**: Automatically escalates on disagreement, red flags, or uncertainty.
+4. **Tenant-Scoped Protocol RAG**: Grounded in hospital-specific clinical protocols (`KnowledgeChunk`).
+5. **Controlled Tool Guardrails**: Pydantic validation -> Rule Audit -> Execution -> `AIUsage` logging.

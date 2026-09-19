@@ -1,59 +1,28 @@
-# Intelligent Capacity-Aware Outbound Queue Design (QUEUE_DESIGN.md)
+# PostCare Intelligent Queue & Scheduling Architecture
 
-## 1. Dynamic Prioritization Algorithm
+*(For the complete submission documentation index, visit [`docs/final/INDEX.md`](./docs/final/INDEX.md) and [`docs/final/QUEUE_DESIGN.md`](./docs/final/QUEUE_DESIGN.md))*
 
-The outbound queue optimizes outreach timing within each patient's clinical follow-up window rather than processing in FIFO insertion order.
+## 1. Queue Purpose & Overview
 
-### Priority Formula:
-$$ \text{priority} = \text{clinical\_risk} + \text{deadline\_pressure} + \text{callback\_urgency} + \text{campaign\_priority} + \text{waiting\_time\_aging} - \text{retry\_penalty} $$
-
-| Component | Calculation Logic | Range |
-| :--- | :--- | :--- |
-| **Clinical Risk** | `URGENT`: +40, `HIGH`: +30, `MEDIUM`: +15, `LOW`: +5 | 5.0 – 40.0 |
-| **Deadline Pressure** | `< 6h remaining`: +40, `< 12h`: +25, `< 24h`: +10 | 0.0 – 50.0 |
-| **Callback Urgency** | Patient requested time reached or overdue: +45 | 0.0 – 45.0 |
-| **Campaign Priority** | `campaign.priority_score * 5` | 0.0 – 50.0 |
-| **Waiting Time Aging** | `+2.0 points per hour waiting` (Starvation Prevention) | 0.0 – 30.0 |
-| **Retry Penalty** | `-5.0 points per failed attempt` (Prioritizes fresh calls) | -15.0 – 0.0 |
+The **PostCare Intelligent Queue Engine** ([`backend/app/queue/queue_engine.py`](file:///c:/Users/CSE/Desktop/PostCare/backend/app/queue/queue_engine.py)) is a capacity-aware, multi-factor prioritization engine for automated post-discharge patient outreach. It ensures that high-risk cardiac and surgical patients are contacted promptly, clinical cutoffs are met, explicit callbacks are prioritized, starvation of lower-priority cases is prevented, and hospital concurrency limits are respected without race conditions.
 
 ---
 
-## 2. Centralized Concurrency Control
+## 2. Priority Calculation Formula
 
-When multiple background workers compete to make calls:
-- The system queries active calls in state `CALLING` for the hospital tenant.
-- If `active_calls >= max_concurrent_calls` (e.g. 10/10), the worker yields and waits.
-- Capacity reservation uses database-level transactional locking:
-  ```sql
-  SELECT * FROM outreach_tasks
-  WHERE hospital_id = :hospital_id
-    AND state IN ('PENDING', 'RETRY_SCHEDULED', 'CALLBACK_SCHEDULED')
-    AND (next_attempt_at IS NULL OR next_attempt_at <= NOW())
-  ORDER BY priority_score DESC
-  FOR UPDATE SKIP LOCKED
-  LIMIT 1;
-  ```
+$$\text{Priority Score} = \text{BaseRisk} + \text{DeadlinePressure} + \text{CallbackUrgency} + (\text{CampaignPriority} \times 5) + \text{Aging} - \text{RetryPenalty}$$
+
+- **Base Risk**: URGENT (40.0), HIGH (30.0), MEDIUM (15.0), LOW (5.0).
+- **Deadline Pressure**: Overdue (+50.0), <=6h (+40.0), <=12h (+25.0), <=24h (+10.0).
+- **Callback Urgency**: Due or overdue (+45.0).
+- **Campaign Priority**: Weight factor $\times 5.0$.
+- **Waiting-Time Aging**: $+2.0$ points per waiting hour (capped at +30.0).
+- **Retry Penalty**: $-5.0$ points per failed attempt.
 
 ---
 
-## 3. Retry Strategy & Exponential Backoff
+## 3. Concurrency Control
 
-When a call outcome is non-terminal (`NO_ANSWER`, `BUSY`, `VOICEMAIL`, `DROPPED`):
-- **Attempt 1 Failure**: Backoff 15 minutes (`next_attempt_at = now + 15m`).
-- **Attempt 2 Failure**: Backoff 60 minutes (`next_attempt_at = now + 60m`).
-- **Attempt 3 Failure**: Maximum attempts (3) reached -> Task transitions to `MANUAL_FOLLOW_UP` and notifies clinical staff.
-
----
-
-## 4. Dropped Call Context Recovery
-
-If a call drops mid-conversation:
-- Partial conversation transcript and answered questions are persisted in `partial_context`.
-- Upon retry, the Voice Intake Agent resumes with the recorded context rather than repeating questions.
-
----
-
-## 5. Crashed Worker Recovery (Heartbeat Timeout)
-
-- Tasks reserved by workers are stamped with `worker_id` and `locked_at`.
-- If a worker crashes while holding capacity, a heartbeat detector identifies tasks stuck in `CALLING` for > 5 minutes, releases the lock, increments `attempt_count`, and resets the state to `RETRY_SCHEDULED`.
+- **Capacity Check**: `active_calling_count < hospital.max_concurrent_calls`.
+- **Row Locking**: PostgreSQL `SELECT FOR UPDATE SKIP LOCKED` prevents race conditions.
+- **Worker Crash Recovery**: Automatically resets stale `CALLING` locks (> 5 min).
