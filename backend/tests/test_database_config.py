@@ -1,0 +1,48 @@
+import pytest
+from app.core.database import prepare_database_config
+
+
+def test_sqlite_url_conversion():
+    url, connect_args = prepare_database_config("sqlite:///./test.db")
+    assert url == "sqlite+aiosqlite:///./test.db"
+    assert connect_args == {"check_same_thread": False}
+
+    url_async, connect_args_async = prepare_database_config("sqlite+aiosqlite:///./test.db")
+    assert url_async == "sqlite+aiosqlite:///./test.db"
+    assert connect_args_async == {"check_same_thread": False}
+
+
+def test_postgres_url_without_sslmode():
+    url, connect_args = prepare_database_config("postgresql://user:secretpass@localhost:5432/postcare")
+    assert url == "postgresql+asyncpg://user:secretpass@localhost:5432/postcare"
+    assert "ssl" not in connect_args
+    assert "sslmode" not in url
+
+
+def test_neon_postgres_url_with_sslmode_require():
+    raw = "postgresql://user:secretpass@ep-xyz.neon.tech/postcare?sslmode=require"
+    url, connect_args = prepare_database_config(raw)
+
+    # 1. Scheme normalized to postgresql+asyncpg
+    assert url.startswith("postgresql+asyncpg://")
+    # 2. sslmode stripped from URL query to prevent asyncpg unexpected keyword argument error
+    assert "sslmode" not in url
+    # 3. SSL translated into asyncpg connect_args["ssl"] = "require"
+    assert connect_args.get("ssl") == "require"
+
+
+def test_postgres_url_with_other_sslmodes():
+    # verify-full
+    url_vf, connect_args_vf = prepare_database_config(
+        "postgresql+asyncpg://user:pass@ep-xyz.neon.tech/postcare?sslmode=verify-full&channel_binding=disable"
+    )
+    assert "sslmode" not in url_vf
+    assert connect_args_vf.get("ssl") == "verify-full"
+    assert "channel_binding=disable" in url_vf
+
+    # disable
+    url_dis, connect_args_dis = prepare_database_config(
+        "postgres://user:pass@localhost:5432/db?sslmode=disable"
+    )
+    assert "sslmode" not in url_dis
+    assert connect_args_dis.get("ssl") is False
