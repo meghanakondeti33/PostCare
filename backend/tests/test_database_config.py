@@ -66,3 +66,31 @@ def test_postgres_url_with_other_sslmodes():
     )
     assert "sslmode" not in url_dis
     assert connect_args_dis.get("ssl") is False
+
+
+@pytest.mark.asyncio
+async def test_knowledge_document_chunk_foreign_key_ingestion(seed_test_data):
+    """Regression test ensuring parent KnowledgeDocument is committed before child KnowledgeChunk records."""
+    from app.rag.protocol_rag import ProtocolRAGService
+    from app.models.domain import KnowledgeDocument, KnowledgeChunk
+    from tests.conftest import TestingSessionLocal
+    from sqlalchemy import select
+
+    async with TestingSessionLocal() as db_session:
+        rag = ProtocolRAGService(db_session, "hosp-metro-1")
+        doc_id = await rag.ingest_protocol_document(
+            title="FK Order Ingestion Test Standard",
+            category="Test Category",
+            content="Paragraph one test.\n\nParagraph two test content.",
+            version="1.0.0"
+        )
+        await db_session.commit()
+
+        res_doc = await db_session.execute(select(KnowledgeDocument).where(KnowledgeDocument.id == doc_id))
+        doc = res_doc.scalar_one_or_none()
+        assert doc is not None
+        assert doc.title == "FK Order Ingestion Test Standard"
+
+        res_chunks = await db_session.execute(select(KnowledgeChunk).where(KnowledgeChunk.document_id == doc_id))
+        chunks = res_chunks.scalars().all()
+        assert len(chunks) == 2

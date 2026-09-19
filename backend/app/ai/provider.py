@@ -73,6 +73,41 @@ class MockAIProvider(AIProviderInterface):
     ) -> Dict[str, Any]:
         prompt_lower = prompt.lower()
         
+        # Check if this is a Voice Intake Agent structured request
+        if "transcript_turns" in json.dumps(response_schema) or "voice intake" in system_instruction.lower():
+            patient_utterance = "I am recovering as expected."
+            if 'AUTHORITATIVE PATIENT UTTERANCES (DO NOT ALTER OR FABRICATE):\n"' in prompt:
+                try:
+                    patient_utterance = prompt.split('AUTHORITATIVE PATIENT UTTERANCES (DO NOT ALTER OR FABRICATE):\n"')[1].split('"')[0]
+                except Exception:
+                    patient_utterance = prompt
+            elif "Patient statement:" in prompt:
+                patient_utterance = prompt
+
+            symptoms = []
+            if "chest" in prompt_lower or "shortness of breath" in prompt_lower:
+                symptoms.append("Chest discomfort / shortness of breath")
+            elif "fever" in prompt_lower or "swelling" in prompt_lower:
+                symptoms.append("Fever / swelling")
+            elif "pain" in prompt_lower:
+                symptoms.append("Pain")
+
+            return {
+                "transcript_turns": [
+                    {"speaker": "AI Voice Agent", "text": "Hello, this is Post-Discharge Outreach checking on your recovery."},
+                    {"speaker": "Patient", "text": patient_utterance},
+                    {"speaker": "AI Voice Agent", "text": "Thank you for providing that update. I am logging your observations."}
+                ],
+                "transcript_text": patient_utterance,
+                "patient_reported_symptoms": symptoms,
+                "observations": symptoms or ["Recovery progressing as expected"],
+                "clarification_questions": [],
+                "callback_preference": None,
+                "completion_status": "COMPLETED",
+                "structured_intake_evidence": [f"Patient statement: '{patient_utterance}'"],
+                "prompt_version": prompt_version
+            }
+
         # Pre-process text to remove common negated symptom phrases before checking red flags
         negation_phrases = [
             "no fever or shortness of breath", "no shortness of breath", "no fever",

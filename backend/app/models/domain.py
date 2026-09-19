@@ -288,6 +288,8 @@ class KnowledgeDocument(Base):
     version = Column(String(50), default="1.0.0")
     created_at = Column(DateTime, default=datetime.utcnow)
 
+    chunks = relationship("KnowledgeChunk", back_populates="document", cascade="all, delete-orphan")
+
 class KnowledgeChunk(Base):
     __tablename__ = "knowledge_chunks"
     
@@ -298,6 +300,8 @@ class KnowledgeChunk(Base):
     text = Column(Text, nullable=False)
     embedding_vector = Column(JSON, nullable=True) # Vector stored as array or JSON for cross-DB compatibility
     metadata_json = Column(JSON, default=dict)
+
+    document = relationship("KnowledgeDocument", back_populates="chunks")
 
 class TriageAssessment(Base):
     __tablename__ = "triage_assessments"

@@ -14,6 +14,7 @@ from app.models.domain import (
 )
 from app.schemas.domain import CallCreateSimulation, CallOut
 from app.ai.provider import get_ai_provider
+from app.ai.voice_agent import VoiceIntakeAgent
 from app.ai.prompts import (
     VOICE_INTAKE_SYSTEM_PROMPT, CLINICAL_TRIAGE_SYSTEM_PROMPT, CURRENT_PROMPT_VERSION,
     format_rag_prompt_context
@@ -55,17 +56,23 @@ async def simulate_outreach_call(
     responses = data.patient_responses or [
         f"I'm feeling ok, but I have some {patient.high_risk_flag and 'chest discomfort and shortness of breath' or 'mild pain'}."
     ]
-    transcript_text = " ".join(responses)
+    query_text = " ".join(responses)
     
-    rag_evidence = await rag_service.retrieve_protocol_evidence(query=transcript_text, top_k=3)
+    rag_evidence = await rag_service.retrieve_protocol_evidence(query=query_text, top_k=3)
 
-    transcript_json = [
-        {"speaker": "AI Voice Agent", "text": f"Hello {patient.first_name}, this is Post-Discharge Outreach checking on your recovery."},
-        {"speaker": f"Patient ({patient.first_name} {patient.last_name})", "text": transcript_text},
-        {"speaker": "AI Voice Agent", "text": "Thank you for providing that update. I am logging your observations."}
-    ]
+    # 3. Execute Voice Intake Agent
+    voice_agent = VoiceIntakeAgent(db, hospital_id)
+    intake_result = await voice_agent.process_intake(
+        patient=patient,
+        task=task,
+        rag_evidence=rag_evidence,
+        patient_responses=responses
+    )
+
+    transcript_json = intake_result.get("transcript_turns", [])
+    transcript_text = intake_result.get("transcript_text", query_text)
     
-    # 3. Save Call & Conversation Records
+    # 4. Save Call & Conversation Records
     outcome = data.simulated_outcome or ("ESCALATED" if any(rf.lower() in transcript_text.lower() for rf in ["chest", "breath", "fever", "severe"]) else "COMPLETED")
     
     call = Call(

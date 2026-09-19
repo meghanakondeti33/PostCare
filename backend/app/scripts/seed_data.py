@@ -154,6 +154,10 @@ async def seed_database(drop_existing: bool = True):
 
         for h in hospitals:
             count_for_hosp = 80 if h.code == "METRO" else 50
+            patients_list = []
+            encounters_list = []
+            discharges_list = []
+            
             for i in range(count_for_hosp):
                 p_id = f"pat-{h.code.lower()}-{i+1}"
                 fn = random.choice(first_names)
@@ -174,7 +178,7 @@ async def seed_database(drop_existing: bool = True):
                     high_risk_flag=is_high_risk,
                     created_at=now - timedelta(days=random.randint(1, 10))
                 )
-                db.add(patient)
+                patients_list.append(patient)
                 
                 # Encounter & Discharge
                 enc_id = f"enc-{h.code.lower()}-{i+1}"
@@ -193,7 +197,7 @@ async def seed_database(drop_existing: bool = True):
                     primary_diagnosis=cond,
                     discharge_status="Discharged Home"
                 )
-                db.add(encounter)
+                encounters_list.append(encounter)
                 
                 risk_tier = "HIGH" if is_high_risk else ("MEDIUM" if i % 3 == 0 else "LOW")
                 discharge = Discharge(
@@ -208,10 +212,15 @@ async def seed_database(drop_existing: bool = True):
                     risk_tier=risk_tier,
                     created_at=dis_time
                 )
-                db.add(discharge)
+                discharges_list.append(discharge)
                 patients_seeded += 1
-                
-        await db.flush()
+
+            db.add_all(patients_list)
+            await db.flush()
+            db.add_all(encounters_list)
+            await db.flush()
+            db.add_all(discharges_list)
+            await db.flush()
 
         print("Seeding Queue Simulation Tasks (25 Mock Patients)...")
         # Seed 25 OutreachTasks with varying priority, deadlines, and queue states for MetroHealth
@@ -266,6 +275,8 @@ async def seed_database(drop_existing: bool = True):
             )
             db.add(el)
 
+        await db.flush()
+
         print("Seeding Initial Escalation & Call Record...")
         call_id = "call-metro-urgent-1"
         call = Call(
@@ -283,6 +294,7 @@ async def seed_database(drop_existing: bool = True):
             metadata_json={"simulated": True}
         )
         db.add(call)
+        await db.flush()
 
         conv = Conversation(
             id="conv-metro-1",

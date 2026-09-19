@@ -80,6 +80,7 @@ class ProtocolRAGService:
             version=version
         )
         self.db.add(doc)
+        await self.db.flush()
         
         # Simple text chunking by paragraph / section
         paragraphs = [p.strip() for p in content.split("\n\n") if p.strip()]
