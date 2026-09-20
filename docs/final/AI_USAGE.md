@@ -116,3 +116,16 @@ AI Model Prediction (JSON)
 
 - **AI Token Tracking**: Token counts and execution latency are tracked in `AIUsage`. Financial cost is calculated using static tier estimations ($0.00015 / 1K tokens).
 - **Prompt Injection Defense**: Adversarial inputs (e.g. *"Ignore previous instructions"*) are safely neutralized because the triage engine evaluates raw patient statements strictly against Pydantic schema enums (`URGENT`, `CONCERNING`, `ROUTINE`).
+
+---
+
+## 8. Client-Side Rate Limiting & Gemini Free-Tier Hardening
+
+Under the Google Gemini Free Tier, model request limits enforce approximately **5 Requests Per Minute (RPM)**. Because a single simulated post-discharge outreach workflow requires 4 sequential Gemini API calls (Voice Intake Agent, Clinical Triage Agent, Assessment A, and Assessment B), PostCare implements application-side rate limiting to remain safe:
+
+1. **Async Sliding-Window Rate Limiter**: Configured via `GEMINI_RPM_SAFETY_LIMIT=4` (default target: 4 RPM, below Google's 5 RPM hard cap). Every API call passes through `GeminiRateLimiter.acquire()`, which waits asynchronously (`asyncio.sleep`) without blocking the FastAPI event loop if the limit is reached.
+2. **HTTP 429 Handling**:
+   - **Temporary RPM Limits**: Evaluates `Retry-After` headers or uses bounded exponential backoff with jitter (`min(0.5 * 2^attempt + jitter, 5.0)`).
+   - **Daily Quota Exhaustion (`RPD` Limit)**: Detects non-retryable project quota exhaustion (`RESOURCE_EXHAUSTED` / `GenerateRequestsPerDayPerProject-FreeTier`) and fails fast with an explicit `AIProviderUnavailableError` without creating retry storms.
+3. **Sequential Assessment Execution**: Assessment A (Protocol Focus) and Assessment B (Holistic Focus) are executed sequentially through the rate limiter to maintain independent reasoning while controlling request timing.
+4. **Clarification**: Client-side rate limiting does not increase Google's quota or guarantee unlimited throughput; it provides deterministic application-side protection against exceeding configured project limits.

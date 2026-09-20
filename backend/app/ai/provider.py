@@ -2,12 +2,74 @@ import json
 import logging
 import asyncio
 import time
+import random
 from abc import ABC, abstractmethod
 from typing import Dict, Any, List, Optional
 import httpx
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
+
+class GeminiRateLimiter:
+    """
+    Async-compatible, in-memory rate limiter for Gemini API requests.
+    Enforces application-side RPM safety limits using a sliding window algorithm.
+    """
+    def __init__(self, target_rpm: Optional[int] = None, window_seconds: float = 60.0):
+        self._target_rpm = target_rpm
+        self.window_seconds = window_seconds
+        self.timestamps: List[float] = []
+        self._lock: Optional[asyncio.Lock] = None
+
+    @property
+    def target_rpm(self) -> int:
+        if self._target_rpm is not None:
+            return self._target_rpm
+        return getattr(settings, "GEMINI_RPM_SAFETY_LIMIT", 4)
+
+    def _get_lock(self) -> asyncio.Lock:
+        if self._lock is None:
+            self._lock = asyncio.Lock()
+        return self._lock
+
+    async def acquire(self):
+        """
+        Acquires permission to send a Gemini API request.
+        If current requests in sliding window >= target_rpm, waits asynchronously
+        until an available slot opens.
+        """
+        lock = self._get_lock()
+        while True:
+            async with lock:
+                now = time.time()
+                cutoff = now - self.window_seconds
+                self.timestamps = [t for t in self.timestamps if t > cutoff]
+
+                rpm_limit = self.target_rpm
+
+                if len(self.timestamps) < rpm_limit:
+                    self.timestamps.append(now)
+                    return
+
+                oldest = self.timestamps[0]
+                wait_time = (oldest + self.window_seconds) - now + 0.1
+
+            if wait_time > 0:
+                logger.info(f"Gemini local rate limiter: waiting {wait_time:.2f}s before sending request (RPM safety limit: {rpm_limit})")
+                await asyncio.sleep(wait_time)
+
+    def reset(self):
+        """Resets the sliding window timestamps and lock (useful for tests)."""
+        self.timestamps.clear()
+        self._lock = None
+
+_gemini_rate_limiter: Optional[GeminiRateLimiter] = None
+
+def get_gemini_rate_limiter() -> GeminiRateLimiter:
+    global _gemini_rate_limiter
+    if _gemini_rate_limiter is None:
+        _gemini_rate_limiter = GeminiRateLimiter()
+    return _gemini_rate_limiter
 
 class AIProviderError(Exception):
     """Base exception for AI provider failures."""
@@ -225,10 +287,26 @@ class GeminiProvider(AIProviderInterface):
                 pass
         return None
 
+    def _is_daily_quota_error(self, body_text: str) -> bool:
+        text_lower = body_text.lower()
+        daily_keywords = [
+            "generaterequestsperdayperproject",
+            "requests per day",
+            "per day",
+            "rpd",
+            "daily quota",
+            "quota exceeded for quota metric 'requests per day'"
+        ]
+        return any(k in text_lower for k in daily_keywords)
+
     async def _post_with_retry(self, url: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         if not self.api_key:
             err_msg = "GEMINI_API_KEY is not configured in environment settings."
             raise AIProviderConfigError(err_msg, provider="gemini", status_code=401)
+
+        # Acquire rate limiter slot before sending API request
+        limiter = get_gemini_rate_limiter()
+        await limiter.acquire()
 
         headers = {
             "x-goog-api-key": self.api_key,
@@ -256,12 +334,21 @@ class GeminiProvider(AIProviderInterface):
                     body_text = self._sanitize_string(resp.text)
                     err_msg = f"Gemini API returned status HTTP {status}: {body_text}"
 
+                    # Daily quota exhaustion check (RPD) - DO NOT RETRY
+                    if status == 429 and self._is_daily_quota_error(body_text):
+                        logger.error(f"Gemini daily quota exhausted (non-retryable): {err_msg}")
+                        raise AIProviderUnavailableError(
+                            f"Gemini daily/project quota exhausted (RPD limit reached): {err_msg}",
+                            provider="gemini",
+                            status_code=429
+                        )
+
                     # 4xx Configuration Errors (400, 401, 403, 404, etc.) - DO NOT RETRY
                     if 400 <= status < 500 and status != 429:
                         logger.error(f"Non-retryable Gemini configuration error (HTTP {status}): {err_msg}")
                         raise AIProviderConfigError(err_msg, provider="gemini", status_code=status)
 
-                    # 429 Rate-Limit or 5xx Transient Server Error - RETRYABLE
+                    # 429 Temporary Rate-Limit or 5xx Transient Server Error - RETRYABLE
                     logger.warning(f"Transient Gemini API error (attempt {attempt}/{total_attempts}, HTTP {status}): {err_msg}")
                     last_exception = AIProviderUnavailableError(
                         err_msg, provider="gemini", status_code=503 if status >= 500 else 429
@@ -277,6 +364,11 @@ class GeminiProvider(AIProviderInterface):
             except AIProviderConfigError:
                 raise
 
+            except AIProviderUnavailableError as pe:
+                if 'status' in locals() and status == 429 and self._is_daily_quota_error(body_text if 'body_text' in locals() and body_text else ""):
+                    raise
+                last_exception = pe
+
             except AIProviderError as pe:
                 last_exception = pe
 
@@ -286,9 +378,10 @@ class GeminiProvider(AIProviderInterface):
                 if retry_after is not None:
                     backoff = retry_after
                 else:
-                    backoff = min(self.initial_backoff * (2 ** (attempt - 1)), self.max_backoff)
+                    jitter = random.uniform(0.1, 0.5)
+                    backoff = min(self.initial_backoff * (2 ** (attempt - 1)) + jitter, self.max_backoff)
 
-                logger.info(f"Retrying Gemini API request in {backoff:.2f}s...")
+                logger.info(f"Retrying Gemini API request in {backoff:.2f}s (attempt {attempt}/{total_attempts})...")
                 await asyncio.sleep(backoff)
 
         # All retries exhausted

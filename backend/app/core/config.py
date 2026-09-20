@@ -37,6 +37,8 @@ class Settings(BaseSettings):
     AI_MODEL: str = os.getenv("AI_MODEL", "gpt-4o-mini")
     EMBEDDING_PROVIDER: str = os.getenv("EMBEDDING_PROVIDER", "mock")
     AI_FALLBACK_TO_MOCK: bool = os.getenv("AI_FALLBACK_TO_MOCK", "false").lower() == "true"
+    GEMINI_RPM_LIMIT: int = int(os.getenv("GEMINI_RPM_LIMIT", "5"))
+    GEMINI_RPM_SAFETY_LIMIT: int = int(os.getenv("GEMINI_RPM_SAFETY_LIMIT", "4"))
     
     # Consensus Policy
     CONSENSUS_POLICY: str = os.getenv("CONSENSUS_POLICY", "STRICT_CONSERVATIVE")

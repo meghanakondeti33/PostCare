@@ -28,14 +28,17 @@ TestingSessionLocal = async_sessionmaker(
 )
 
 from app.core.config import settings
+from app.ai.provider import get_gemini_rate_limiter
 
 @pytest_asyncio.fixture(autouse=True)
 async def setup_db():
     settings.AI_PROVIDER = "mock"
+    get_gemini_rate_limiter().reset()
     async with engine.begin() as conn:
         await conn.run_sync(lambda sync_conn: Base.metadata.drop_all(sync_conn, checkfirst=True))
         await conn.run_sync(Base.metadata.create_all)
     yield
+    get_gemini_rate_limiter().reset()
     async with engine.begin() as conn:
         await conn.run_sync(lambda sync_conn: Base.metadata.drop_all(sync_conn, checkfirst=True))
 
